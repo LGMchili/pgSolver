@@ -25,7 +25,7 @@ public:
     void addCurrentSource(std::string* words);
     void initAdjacencyMatrix();
     void init_shortest_path();
-    void convert_matrix_to_MNA(Eigen::MatrixXd &matrix);
+    void convert_matrix_to_MNA(Eigen::MatrixXd& matrix);
     void getAdmittanceMatrix(Eigen::MatrixXd& matrix);
     void getCurrentVector(Eigen::MatrixXd& matrix);
     void solve();

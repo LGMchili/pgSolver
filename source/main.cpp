@@ -8,7 +8,7 @@ int main(){
     std::string file;
 
     if(getenv("DEBUG"))
-        file = "3x3.net";
+        file = "./test/3x3.net";
     else{
         std::cout << "Input File:" << std::endl;
         std::cin >> file;
