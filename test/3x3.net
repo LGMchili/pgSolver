@@ -1,0 +1,6 @@
+r1 n1 n2 1
+r2 n2 n3 1
+r3 n3 n4 1
+r4 n4 gnd 1
+i1 n1 gnd -1
+r0 n1 gnd 1
