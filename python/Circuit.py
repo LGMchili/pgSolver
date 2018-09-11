@@ -19,7 +19,7 @@ class SpiceCircuit(object):
         self._CurrentSource = []
         self._VoltageSource = []
         self._adjacencyMatrix = np.empty(())
-        self._currentVector = np.empty(())
+        self._Vector = np.empty(())
         self._Ar = np.empty(())
         self._Ac = np.empty(())
 
@@ -140,31 +140,42 @@ class SpiceCircuit(object):
             if Nn not in 'GNDgnd0' and Np not in 'GNDgnd0':
                 self._Ac[self._NodeMap[Np]][self._NodeMap[Nn]] -= 1 / val
                 self._Ac[self._NodeMap[Nn]][self._NodeMap[Np]] -= 1 / val
-
+        vindex = 0
         for vsrc in self._VoltageSource:
             Np = vsrc._Np
             Nn = vsrc._Nn
             val = vsrc._val
             if Np not in 'GNDgnd0':
-                self._Ar[self._NodeMap[Np] + k][self._NodeMap[Np]] += val
-                self._Ar[self._NodeMap[Np]][self._NodeMap[Np] + k] += val
+                self._Ar[k + vindex][self._NodeMap[Np]] += val
+                self._Ar[self._NodeMap[Np]][k + vindex] += val
             if Nn not in 'GNDgnd0':
-                self._Ar[self._NodeMap[Np] + k][self._NodeMap[Np]] -= val
-                self._Ar[self._NodeMap[Np]][self._NodeMap[Np] + k] -= val
+                self._Ar[k + vindex][self._NodeMap[Np]] -= val
+                self._Ar[self._NodeMap[Np]][k + vindex] -= val
+            vindex += 1
 
     def createCurrentVector(self):
+        k = len(self._Nodes)
         m = len(self._CurrentSource)
-        n = len(self._Nodes) + len(self._VoltageSource)
-        self._currentVector = np.zeros((n,1))
-        for cur in self._CurrentSource:
-            Np = cur._Np
-            Nn = cur._Nn
-            val = cur._val
+        n = k + len(self._VoltageSource)
+        self._Vector = np.zeros((n,1))
+        for isrc in self._CurrentSource:
+            Np = isrc._Np
+            Nn = isrc._Nn
+            val = isrc._val
             if Np not in 'GNDgnd0':
-                self._currentVector[self._NodeMap[Np]] -= val
+                self._Vector[self._NodeMap[Np]] -= val
             if Nn not in 'GNDgnd0':
-                self._currentVector[self._NodeMap[Nn]] += val
-
+                self._Vector[self._NodeMap[Nn]] += val
+        vindex = 0
+        for vsrc in self._VoltageSource:
+            Np = isrc._Np
+            Nn = isrc._Nn
+            val = isrc._val
+            if Np not in 'GNDgnd0':
+                self._Vector[vindex + k] += val
+            if Nn not in 'GNDgnd0':
+                self._Vector[vindex + k] -= val
+            vindex += 1
     def debugCircuit(self):
         # print('Node map:')
         # print(self._NodeMap)
@@ -174,4 +185,4 @@ class SpiceCircuit(object):
         # print('Number of current source: %d' %(len(self._CurrentSource)))
         # print('Number of voltage source: %d' %(len(self._VoltageSource)))
         print(self._Ar)
-        # print(self._currentVector)
+        # print(self._Vector)
