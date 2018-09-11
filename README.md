@@ -1,3 +1,3 @@
 # pgSolver
 
-a simple solver for larget power grid
+a simple solver for large power grid
