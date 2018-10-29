@@ -1,59 +1,90 @@
-from Circuit import SpiceCircuit
-import numpy as np
-import scipy.io
-from scipy.linalg import lu
-class SpiceParser:
-    """This class takes a filename or buffer in a Spice-like format
-    and constructs a Circuit object.
-    """
 
-    def __init__(self, filename=None):
-        self._fileName = filename
-        self._circuit = SpiceCircuit()
+def netlistParsing(self, filename):
+    # parsing the input netlist
+    with open(filename, 'r') as content:
+        for line in content:
+            line = line.rstrip()
+            if not line or line.startswith('*'):
+                continue
+            line  = line.lower()
+            if len(wl) < 4 and wl[0].startswith(('*', '#')):
+                return
+            elif wl[0].startswith('r'):
+                addResistor(wl[0], wl[1], wl[2], wl[3])
+            elif wl[0].startswith('c'):
+                addCapacitor(wl[0], wl[1], wl[2], wl[3])
+            elif wl[0].startswith('v'):
+                addVoltageSource(wl[0], wl[1], wl[2], wl[3])
+            elif wl[0].startswith('i'):
+                addCurrentSource(wl[0], wl[1], wl[2], wl[3])
 
-        if self._fileName is not None:
-            f = open(filename, 'r')
-            self.ParseLines(f.readlines())
-            f.close()
+def addResistor(self, name, Np, Nn, val):
+    val = float(val)
+    res = Component(name, Np, Nn, val)
+    self._Resistors.append(res)
+    assert val > 0
+    if Np not in 'GNDgnd0' and Np not in self._Nodes:
+        n = len(self._NodeMap)
+        self._NodeMap[Np] = n
+        self._Nodes.append(Np)
+        # print("add node %s as %d" %(Np,n))
+    if Nn not in 'GNDgnd0' and Nn not in self._Nodes:
+        n = len(self._NodeMap)
+        self._NodeMap[Nn] = n
+        self._Nodes.append(Nn)
+        # print("add node %s as %d" %(Np,n))
 
-    def ParseLines(self, lines):
-        for line in lines:
-            self.ParseLine(line)
+def addCapacitor(self, name, Np, Nn, val):
+    val = float(val)
+    cap = Component(name, Np, Nn, val)
+    self._Capacitors.append(cap)
+    assert val > 0
+    if Np not in 'GNDgnd0' and Np not in self._Nodes:
+        n = len(self._NodeMap)
+        self._NodeMap[Np] = n
+        self._Nodes.append(Np)
+        # print("add node %s as %d" %(Np,n))
+    if Nn not in 'GNDgnd0' and Nn not in self._Nodes:
+        n = len(self._NodeMap)
+        self._NodeMap[Nn] = n
+        self._Nodes.append(Nn)
+        # print("add node %s as %d" %(Np,n))
 
-    def ParseLine(self, line):
-        line = line.lower()
-        wl = line.strip().split()
-        if not wl:
-            return
-        if len(wl) < 4 and wl[0].startswith(('*', '#')):
-            return
-        elif wl[0].startswith('r'):
-            self._circuit.addResistor(wl[0], wl[1], wl[2], wl[3])
-        elif wl[0].startswith('c'):
-            self._circuit.addCapacitor(wl[0], wl[1], wl[2], wl[3])
-        elif wl[0].startswith('v'):
-            self._circuit.addVoltageSource(wl[0], wl[1], wl[2], wl[3])
-        elif wl[0].startswith('i'):
-            self._circuit.addCurrentSource(wl[0], wl[1], wl[2], wl[3])
+def addCurrentSource(self, name, Np, Nn, val):
+    val = float(val)
+    csrc = Component(name, Np, Nn, val)
+    self._CurrentSource.append(csrc)
+    if Np not in 'GNDgnd0' and Np not in self._Nodes:
+        n = len(self._NodeMap)
+        self._NodeMap[Np] = n
+        self._Nodes.append(Np)
+        # print("add node %s as %d" %(Np,n))
+    if Nn not in 'GNDgnd0' and Nn not in self._Nodes:
+        n = len(self._NodeMap)
+        self._NodeMap[Nn] = n
+        self._Nodes.append(Nn)
+        # print("add node %s as %d" %(Np,n))
 
-if __name__ == "__main__":
-    parser = SpiceParser('../test/3x3.net')
-    parser._circuit.createdmittanceMatrix()
-    parser._circuit.createCurrentVector()
-    parser._circuit.debugCircuit()
-    # matrix = parser._circuit.getAdmittanceMatrix()
+def addCurrentSourcePWL(self, wl):
+    name = wl[0]
+    Np = wl[1]
+    Nn = wl[2]
+    waveform = []
+    pairs = []
+    for i in range(2, len(wl)):
+        pairs.append([wl[i-1], wl[i]])
 
-    # vector = parser._circuit.getCurrentVector()
-    # scipy.io.savemat('./netlist.mat', mdict={'matrix': matrix})
-    # np.save('./netlist', matrix)
-
-    # res = np.linalg.solve(matrix,vector)
-    # l = np.linalg.cholesky(matrix)
-    # p, l, u = lu(matrix)
-    # print(matrix)
-    # print(vector)
-    # print(res)
-    # print(u)
-    # print(np.transpose(l))
-    # print(np.dot(l,u))
-    # or l @ u
+def addVoltageSource(self, name, Np, Nn, val):
+    val = float(val)
+    vsrc = Component(name, Np, Nn, val)
+    self._VoltageSource.append(vsrc)
+    if Np not in 'GNDgnd0' and Np not in self._Nodes:
+        n = len(self._NodeMap)
+        self._NodeMap[Np] = n
+        self._Nodes.append(Np)
+        # print("add node %s as %d" %(Np,n))
+    if Nn not in 'GNDgnd0' and Nn not in self._Nodes:
+        n = len(self._NodeMap)
+        self._NodeMap[Nn] = n
+        self._Nodes.append(Nn)
+        # print("add node %s as %d" %(Np,n))

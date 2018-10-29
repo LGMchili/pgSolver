@@ -22,6 +22,8 @@ class SpiceCircuit(object):
         self._Vector = np.empty(())
         self._Ar = np.empty(())
         self._Ac = np.empty(())
+        self._h = 0.01 # timestep
+        self._t = 10.0 # total simulation time
 
     def mapNode(self, nodeName):
         if nodeName not in 'GNDgnd0':
@@ -77,6 +79,21 @@ class SpiceCircuit(object):
             self._NodeMap[Nn] = n
             self._Nodes.append(Nn)
             # print("add node %s as %d" %(Np,n))
+
+    def addCurrentSourcePWL(self, wl):
+        name = wl[0]
+        Np = wl[1]
+        Nn = wl[2]
+        waveform = []
+        pairs = []
+        for i in range(2, len(wl)):
+            pairs.append([wl[i-1], wl[i]])
+
+        # TODO:
+        # mark it as pwl
+        # pwlsrc = Component('pwl', Np, Nn, val)
+        for
+
 
     def addVoltageSource(self, name, Np, Nn, val):
         val = float(val)
@@ -153,7 +170,7 @@ class SpiceCircuit(object):
                 self._Ar[self._NodeMap[Np]][k + vindex] -= val
             vindex += 1
 
-    def createCurrentVector(self):
+    def createVector(self):
         k = len(self._Nodes)
         m = len(self._CurrentSource)
         n = k + len(self._VoltageSource)
@@ -176,6 +193,16 @@ class SpiceCircuit(object):
             if Nn not in 'GNDgnd0':
                 self._Vector[vindex + k] -= val
             vindex += 1
+
+    def solve(self):
+        parser._circuit.createdmittanceMatrix()
+        parser._circuit.createVector()
+        h = self._h
+        t = self._t
+        step = t / h
+        for s in range(step):
+
+
     def debugCircuit(self):
         # print('Node map:')
         # print(self._NodeMap)
@@ -184,5 +211,8 @@ class SpiceCircuit(object):
         # print('Number of capacitors: %d' %(len(self._Capacitors)))
         # print('Number of current source: %d' %(len(self._CurrentSource)))
         # print('Number of voltage source: %d' %(len(self._VoltageSource)))
-        print(self._Ar)
+        # print(self._Ar)
         # print(self._Vector)
+        print(self._Ar.shape)
+        print(self._Ac.shape)
+        print(self._Vector.shape)
