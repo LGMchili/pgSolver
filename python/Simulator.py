@@ -188,7 +188,7 @@ class Simulator(object):
             name = self._Inductors[i]._name
             Np = self._Inductors[i]._Np
             Nn = self._Inductors[i]._Nn
-            val = self._Directvie[2] / self._Inductors[i]._val # h / L
+            val = 1 / self._Inductors[i]._val # h / L
             diag.append(val)
             if Np not in ['GND', 'gnd', '0']:
                 self._Al[i, self._NodeMap[Np]] = 1
@@ -246,15 +246,15 @@ class Simulator(object):
         # Il = self.buildCompVector(self._Al, self._Il)[:, 0]
         vn = np.ones((n, self._Directvie[3]))
         # solve the system -> Ax = b
-        A = G + (C / h) + L
-        mat_rhs = C / h
+        A = G + (2 / h * C ) + h / 2 * L
+        mat_rhs = -G + (2 / h *  C ) - h / 2 * L
         lu, piv = ssl.lu_factor(A)
         for step in range(1, self._Directvie[3]):
             v = np.dot(mat_rhs, vn[:, step - 1]) # first part of the right hand side
-            i = Ii[:, step] # second part of the right hand side
+            i = Ii[:, step] + Ii[:, step - 1] # second part of the right hand side
             self.updateIndCurrent(vn[:, step - 1])
             l = self.buildCompVector(self._Al, self._Il)[:, 0]
-            rhs = v + i - l
+            rhs = v + i
             vn[:, step] = ssl.lu_solve((lu, piv), rhs)
             # vn[:, step] = np.linalg.solve(A, rhs)
             # print(vn[:, step])
