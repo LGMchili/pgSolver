@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy.linalg as ssl
+import timeit
 class Component(object):
     def __init__(self, name, Np, Nn, val):
         self._name = name
@@ -246,30 +248,36 @@ class Simulator(object):
         # solve the system -> Ax = b
         A = G + (C / h) + L
         mat_rhs = C / h
-        print(L)
+        lu, piv = ssl.lu_factor(A)
         for step in range(1, self._Directvie[3]):
             v = np.dot(mat_rhs, vn[:, step - 1]) # first part of the right hand side
             i = Ii[:, step] # second part of the right hand side
             self.updateIndCurrent(vn[:, step - 1])
             l = self.buildCompVector(self._Al, self._Il)[:, 0]
             rhs = v + i - l
-            vn[:, step] = np.linalg.solve(A, rhs)
+            vn[:, step] = ssl.lu_solve((lu, piv), rhs)
+            # vn[:, step] = np.linalg.solve(A, rhs)
+            # print(vn[:, step])
+            # break
         self._Result = vn
 
     def plot(self, node):
         waveform = self._Result[self._NodeMap[node], :]
         # print(waveform)
+        plt.subplot(211)
         plt.plot(self._LineSpace, waveform)
-        plt.show()
 
     def plotCurrentSource(self, k):
         waveform = self._Ii[k]
+        plt.subplot(212)
         plt.plot(self._LineSpace, waveform)
-        plt.show()
 
 if __name__ == "__main__":
     simulator = Simulator('testCir.sp')
+    start = timeit.default_timer()
     simulator.solve()
+    stop = timeit.default_timer()
+    print(str(stop - start) + 's')
     simulator.plot('n1_0_0')
-    # simulator.plotCurrentSource(1)
-    # plt.show()
+    simulator.plotCurrentSource(1)
+    plt.show()
