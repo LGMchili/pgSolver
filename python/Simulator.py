@@ -160,11 +160,11 @@ class Simulator(object):
             iv = np.dot(B, vn[:, step - 1]) # first part of the right hand side
             ii = Ii[:, step] + Ii[:, step - 1] # second part of the right hand side
             rhs = iv + ii - il
+            # TODO: somehow the lu solve is slower with small circuit
             vn[:, step] = ssl.lu_solve((lu, piv), rhs)
+            # vn[:, step] = np.linalg.solve(A, rhs)
             il = il + np.dot(S, vn[:, step] + vn[:, step - 1]) # update current of inductors
         self._Result = vn
-
-
 
     def plot(self, node):
         waveform = self._Result[self._parser._NodeMap[node], :]
@@ -177,8 +177,8 @@ class Simulator(object):
         plt.plot(self._parser._steps, waveform)
 
 if __name__ == "__main__":
-    simulator = Simulator('testCir.sp')
+    simulator = Simulator('tstCir.sp')
     simulator.simulate()
-    simulator.plot('n1_100_0')
+    simulator.plot('n700')
     simulator.plotCurrentSource(1)
     plt.show()
