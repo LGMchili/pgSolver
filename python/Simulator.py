@@ -6,78 +6,14 @@ import sys
 from Parser import *
 
 class Simulator(object):
-    """docstring for Simulator."""
+    # TODO: there's a bug that the pwl current must start with 0
+    """otherwise, the results will have large error with Hspice"""
     def __init__(self, netlist):
-        self._NodeMap = {} # node with number
-        self._Nodes = []
-        self._Resistors = []
-        self._Capacitors = []
-        self._Inductors = []
-        self._CurrentSource = []
-        self._VoltageSource = []
-        self._adjacencyMatrix = np.empty(())
-        self._Vector = np.empty(())
-        self._Ag = np.empty(())
-        self._Ac = np.empty(())
-        self._Al = np.empty(())
-        self._Ai = np.empty(())
-        self._G = np.empty(())
-        self._L = np.empty(())
-        self._C = np.empty(())
         self._Ii = np.empty(())
-        self._Il = np.empty(())
-        self._A = np.empty(())
-        self._B = np.empty(())
-        self._Directvie = [0, 10, 0.01, 100] # [start, end, delta, steps]
-        self._LineSpace = []
         self._Result = np.empty(())
-        self._Vdd = 1
         self._parser = None
         self._filename = netlist
         self._parser = SpiceParser(self._filename)
-        # self.buildAdjacentMatrix()
-
-    def simulate(self):
-        self.solve()
-
-    def buildCircuit(self):
-        Ag, diagG = self.buildAg()
-        Ac, diagC = self.buildAc()
-        Al, diagL = self.buildAl()
-        Ai, vecI = self.buildAi()
-        G = self.createMatrix(Ag, diagG)
-        C = self.createMatrix(Ac, diagC)
-        L = self.createMatrix(Al, diagL)
-        Ii = self.createVector(Ai, vecI)
-        h = self._parser._delta
-        # solving Av(t+delta) = Bv(t) + I
-        A = G + (2 * C / h) + (h * L / 2)
-        B = -G + (2 * C / h) - (h * L / 2)
-        S = h * L
-        return A, B, S, Ii
-
-    def solve(self):
-        n = len(self._parser._Nodes) # number of node
-        t = len(self._parser._steps) # number of steps
-        vn = np.ones((n, len(self._parser._steps)))
-        # solving Av(t+delta) = Bv(t) + I
-        A, B, S, Ii = self.buildCircuit()
-        lu, piv = ssl.lu_factor(A)
-        il = np.zeros((n, ))
-        # print(Ii.shape)
-        # sys.exit()
-        for step in range(1, t):
-            iv = np.dot(B, vn[:, step - 1]) # first part of the right hand side
-            ii = Ii[:, step] + Ii[:, step - 1] # second part of the right hand side
-            # self.updateIndCurrent(vn[:, step - 1])
-            # l = self.buildCompVector(self._Al, self._Il)[:, 0]
-            rhs = iv + ii - il
-            vn[:, step] = ssl.lu_solve((lu, piv), rhs)
-            il = il + np.dot(S, vn[:, step] + vn[:, step - 1])
-        self._Result = vn
-
-    def buildNodeMap(self):
-        pass
 
     def buildAg(self):
         # size of adjacent matrix is decided by m = num of comps, n = num of nodes
@@ -143,15 +79,16 @@ class Simulator(object):
     def buildAi(self):
         m = len(self._parser._CurrentSource)
         n = len(self._parser._NodeMap)
+        length = len(self._parser._steps)
         Ai = np.zeros((m, n))
-        Ii = []
+        Ii = np.zeros((m, length))
         index = 0
         for csrc in self._parser._CurrentSource:
             name = csrc._name
             Np = csrc._Np
             Nn = csrc._Nn
             val = csrc._val
-            Ii.append(val)
+            Ii[index] = val
             if Np not in ['GND', 'gnd', '0']:
                 Ai[index, self._parser._NodeMap[Np]] = 1
             if Nn not in ['GND', 'gnd', '0']:
@@ -168,11 +105,66 @@ class Simulator(object):
         mat = np.dot(adj.T, vector)
         return mat
 
-    def updateIndCurrent(self, currVolt):
-        # TODO:
-        for i in range(len(self._Il)):
-            self._Il[i] = 1 - currVolt[self._NodeMap[self._Inductors[i]._Np]] / 1
-        # print(self._Il)
+    def buildDcCircuit(self):
+        Ag, diagG = self.buildAg()
+        Ac, diagC = self.buildAc()
+        Al, diagL = self.buildAl()
+        # m, n = Al.shape
+        # diagL = np.diag([1 for i in range(m)])
+        Ai, vecI = self.buildAi()
+        vecI = vecI[:, 0] # take the initial value
+        G = self.createMatrix(Ag, diagG)
+        L = self.createMatrix(Al, diagL)
+        Ii = self.createVector(Ai, vecI)
+        return G + L, Ii
+
+    def buildTransientCircuit(self):
+        Ag, diagG = self.buildAg()
+        Ac, diagC = self.buildAc()
+        Al, diagL = self.buildAl()
+        Ai, vecI = self.buildAi()
+        G = self.createMatrix(Ag, diagG)
+        C = self.createMatrix(Ac, diagC)
+        L = self.createMatrix(Al, diagL)
+        Ii = self.createVector(Ai, vecI)
+        h = self._parser._delta
+        # solving Av(t+delta) = Bv(t) + I
+        A = G + (2 * C / h) + (h * L / 2)
+        B = -G + (2 * C / h) - (h * L / 2)
+        S = h * L
+        return A, B, S, Ii
+
+    def simulate(self):
+        # self.solveDC()
+        start = timeit.default_timer()
+        self.solveTransient()
+        stop = timeit.default_timer()
+        print(str(stop - start) + 's')
+
+    def solveDC(self):
+        n = len(self._parser._Nodes) # number of node
+        vn = np.ones((n, ))
+        A, Ii = self.buildDcCircuit()
+        x = np.linalg.solve(A, Ii)
+        return x
+
+    def solveTransient(self):
+        n = len(self._parser._Nodes) # number of node
+        t = len(self._parser._steps) # number of steps
+        vn = np.zeros((n, t))
+        vn[:, 0] = self.solveDC()
+        A, B, S, Ii = self.buildTransientCircuit()
+        lu, piv = ssl.lu_factor(A)
+        il = np.zeros((n, ))
+        for step in range(1, t):
+            iv = np.dot(B, vn[:, step - 1]) # first part of the right hand side
+            ii = Ii[:, step] + Ii[:, step - 1] # second part of the right hand side
+            rhs = iv + ii - il
+            vn[:, step] = ssl.lu_solve((lu, piv), rhs)
+            il = il + np.dot(S, vn[:, step] + vn[:, step - 1]) # update current of inductors
+        self._Result = vn
+
+
 
     def plot(self, node):
         waveform = self._Result[self._parser._NodeMap[node], :]
@@ -186,10 +178,7 @@ class Simulator(object):
 
 if __name__ == "__main__":
     simulator = Simulator('testCir.sp')
-    start = timeit.default_timer()
     simulator.simulate()
-    stop = timeit.default_timer()
-    print(str(stop - start) + 's')
-    simulator.plot('n1_50_0')
+    simulator.plot('n1_100_0')
     simulator.plotCurrentSource(1)
     plt.show()
