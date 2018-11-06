@@ -1,67 +1,130 @@
 #include "netListParser.h"
+#include <iostream>
+#include <thread>
+#include <mutex>
+#include <sstream>
+#include <unordered_map>
+#include "ThreadPool.h"
+using namespace std;
 
-Parser::Parser(std::string FileName, Circuit* cir){
-    // std::ifstream in(f);
-    _cir = cir;
-    _fileName = FileName;
+Parser::Parser():_debug(false), _threadNum(16), _steps(1){
+    _resistors = new vector<component>;
+    _inductors = new vector<component>;
+    _capacitors = new vector<component>;
+    _currentSource = new vector<component>;
+    _voltageSource = new vector<component>;
+    // clock_t mstart = clock();
+    // parse(fileName);
+    // clock_t mend = clock();
+    // cout << "total time: " << (mend - mstart) / (double) CLOCKS_PER_SEC << "s" << endl;
     if(getenv("DEBUG"))
         _debug = true;
+
 };
 
-void Parser::Parse(){
-    std::ifstream file;
-    std::string sLine = "";
-    if(_debug)
-        std::cout <<  "netlist: "
-        << _fileName
-        << std::endl;
-    file.open(_fileName);
+Parser::~Parser(){
+    delete _resistors;
+    delete _inductors;
+    delete _capacitors;
+    delete _currentSource;
+    delete _voltageSource;
+}
+
+void Parser::parse(string fileName){
+    //
+    clock_t mstart = clock();
+    ifstream file;
+    file.open(fileName);
+    string sLine = "";
     while (!file.eof()) {
         getline(file, sLine);
-        ParseLine(sLine);
+        if(sLine.empty() || sLine[0] == '*'){
+            continue;
+        }
+        toLower(sLine);
+        _lines.push_back(sLine);
     }
-};
-
-void Parser::ParseLine(std::string line){
-    if(line.empty() || *(line.begin()) == '*')
-        return;
-    std::string component = "RrLlCcVvIi";
-    if(component.find(line.front()) != std::string::npos){
-        AddComponent(line);
+    clock_t mend = clock();
+    cout << "time for reading: " << (mend - mstart) / (double) CLOCKS_PER_SEC << "s" << endl;
+    // multi thread
+    // ThreadPool* pool = new ThreadPool(_threadNum);
+    // for(int i = 0; i < _lines.size(); ++i) {
+    //     // cout << _lines[i] << endl;
+    //     pool->enqueue([&, i]{
+    //             // std::unique_lock<std::mutex> lock(mutex);
+    //             parseLine(_lines[i]);
+    //             // cout << _lines[i] << endl;
+    //         }
+    //     );
+    // }
+    // delete pool;
+    // single thread
+    for(string& l : _lines){
+        parseLine(l);
     }
+    cout << "total resistors: " << _resistors->size() << endl;
+    cout << "total inductors: " << _inductors->size() << endl;
+    cout << "total capacitors: " << _capacitors->size() << endl;
+    cout << "total current source: " << _currentSource->size() << endl;
+    // cout << "processed lines: " << _tst.size() << endl;
+}
 
-    //TODO: add pwl waveform
-};
-
-// add a RLC or Source component from netlist
-void Parser::AddComponent(std::string& line){
-    size_t last = 0;
-    size_t next = 0;
-    int index = 0;
-    std::string words[4] = {};
-    std::string delimiter = " "; // split the line by blank
-    if(getenv("DEBUG"))
-        std::cout<<line<<std::endl;
-    while ((next = line.find(delimiter, last)) != std::string::npos) {
-        // std::cout << line.substr(last, next-last) << std::endl;
-        words[index] = line.substr(last, next - last);
-        last = next + 1;
-        index++;
+void Parser::parseLine(const string& line){
+    if(line[0] == '.'){
+        addDirective(line);
     }
-    // std::cout << line.substr(last) << std::endl;
-    words[index] = line.substr(last); // each element in words represents componentX node1 node2 value
-    std::string resistorType = "Rr";
-    std::string currentType = "Ii";
-    if (resistorType.find(words[0][0]) != std::string::npos)
-        _cir->addResistor(words);
-    else if(currentType.find(words[0][0]) != std::string::npos)
-        _cir->addCurrentSource(words);
-    // else if(words[0][0] == 'C')
-    //     _cir.addCapacitor(words[0],words[1],words[2],words[3]);
-    // else if(words[0][0] == 'L')
-    //     _cir.addInductor(words[0],words[1],words[2],words[3]);
-    // else if(words[0][0] == 'V')
-    //     _cir.AddVoltageSource(words[0],words[1],words[2],words[3]);
-    // else if(words[0][0] == 'i')
-    //     _cir.addCurrentSource(words[0],words[1],words[2],words[3]);
-};
+    else{
+        // TODO: build nodeMap
+        if(line[0] == 'i'){
+            addCurrentSource(line);
+        }
+        else{
+            addPassive(line);
+        }
+    }
+}
+
+void Parser::addDirective(const string& line){
+    vector<string> words;
+    split(words, line);
+    float start = stof(words[1]);
+    float end = stof(words[2]);
+    float delta = stof(words[3]);
+    // unique_lock<mutex> lck(_mtx);
+    _steps = (end - start) / delta + 1;
+}
+
+void Parser::addCurrentSource(const string& line){
+    vector<string> words;
+    split(words, line);
+    if(words.size() == 4){
+        // dc source
+        addDcCurrent(words[0], words[1], words[2], words[3]);
+    }
+    else if(words.size() > 4){
+        string name = words[0];
+        string Np = words[1];
+        string Nn = words[2];
+        words.erase(words.begin(), words.begin() + 4);
+        addPwlCurrent(name, Np, Nn, words);
+    }
+}
+
+void Parser::addPassive(const string& line){
+    string str(line);
+    string buf;                 // Have a buffer string
+    stringstream ss(str);       // Insert the string into a stream
+    vector<string> words; // Create vector to hold our words
+    while (ss >> buf){
+        words.push_back(buf);
+    }
+    if(words[0][0] == 'r'){
+        addResistor(words[0], words[1], words[2], words[3]);
+    }
+    else if(words[0][0] == 'l'){
+        addInductor(words[0], words[1], words[2], words[3]);
+    }
+    else if(words[0][0] == 'c'){
+        addCapacitor(words[0], words[1], words[2], words[3]);
+    }
+}
