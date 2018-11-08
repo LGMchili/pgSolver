@@ -5,17 +5,18 @@
 #include <fstream>
 #include <vector>
 #include <functional>
+#include <unordered_map>
 #include "Circuit.h"
 using namespace std;
 struct component
 {
-    component(string name, string Np, string Nn, string val){
+    component(string name, string Np, string Nn, float val){
         _name = name;
         _Np = Np;
         _Nn = Nn;
         _val = val;
     }
-    component(string name, string Np, string Nn, vector<string>& val){
+    component(string name, string Np, string Nn, vector<float>& val){
         _name = name;
         _Np = Np;
         _Nn = Nn;
@@ -25,9 +26,9 @@ struct component
     }
     bool isDC(){ return _isDC; }
     string _name, _Np, _Nn;
-    string _val;
+    float _val;
     bool _isDC = true;
-    vector<string> _waveform;
+    vector<float> _waveform;
 };
 class Parser{
 public:
@@ -39,6 +40,12 @@ public:
     void addPassive(const string& line);
     void addCurrentSource(const string& line);
     void initCurrentSource();
+    inline vector<component>* getResistors(){ return _resistors; }
+    inline vector<component>* getInductors(){ return _inductors; }
+    inline vector<component>* getCapacitors(){ return _capacitors; }
+    inline vector<component>* getCurrentSource(){ return _currentSource; }
+    inline vector<component>* getVoltageSource(){ return _voltageSource; }
+    inline unordered_map<string, int>* getNodeMap(){ return _nodeMap; }
 private:
     void split(vector<string>& words, const string& line){
         string str(line);
@@ -48,10 +55,8 @@ private:
             words.push_back(buf);
         }
     }
-    void interp(vector<float>& t, vector<float>& v, int steps){
-        // TODO:
-        return;
-    }
+    void addNode(const string& line);
+    void interp(vector<float>& result, vector<float>& xp, vector<float>& fp);
     inline void toLower(string& str){
         for(char& cr : str){
             if(cr <= 'Z' && cr >= 'A'){
@@ -59,31 +64,26 @@ private:
             }
         }
     }
-    inline void addResistor(string name, string Np, string Nn, string val){
+    inline void addResistor(string name, string Np, string Nn, float val){
         // unique_lock<mutex> lck(_mtx);
         _resistors->emplace_back(name, Np, Nn, val);
     }
-    inline void addCapacitor(string name, string Np, string Nn, string val){
+    inline void addCapacitor(string name, string Np, string Nn, float val){
         // unique_lock<mutex> lck(_mtx);
         _capacitors->emplace_back(name, Np, Nn, val);
     }
-    inline void addInductor(string name, string Np, string Nn, string val){
+    inline void addInductor(string name, string Np, string Nn, float val){
         // unique_lock<mutex> lck(_mtx);
         _inductors->emplace_back(name, Np, Nn, val);
     }
-    inline void addDcCurrent(string name, string Np, string Nn, string val){
+    inline void addDcCurrent(string name, string Np, string Nn, float val){
         // unique_lock<mutex> lck(_mtx);
         _currentSource->emplace_back(name, Np, Nn, val);
     }
-    inline void addPwlCurrent(string name, string Np, string Nn, vector<string> val){
+    inline void addPwlCurrent(string name, string Np, string Nn, vector<float> val){
         // unique_lock<mutex> lck(_mtx);
         _currentSource->emplace_back(name, Np, Nn, val);
     }
-    inline vector<component>* getResistors(){ return _resistors; }
-    inline vector<component>* getInductors(){ return _inductors; }
-    inline vector<component>* getCapacitors(){ return _capacitors; }
-    inline vector<component>* getCurrentSource(){ return _currentSource; }
-    inline vector<component>* getVoltageSource(){ return _voltageSource; }
     // inline void addCurrentSource(string name, string Np, string Nn, string val){
     //     _currentSource.emplace_back(name, Np, Nn, val);
     // }
@@ -93,15 +93,17 @@ private:
     bool _debug = false;
     unsigned _threadNum;
     int _steps;
-    float _delta;
+    int _nodeSize;
+    float _delta, _end;
     string _fileName;
     vector<string> _lines;
     vector<string> _tst;
     mutex _mtx;
     vector<function<void()> > _tasks;
+    vector<float> _axis_x;
     vector<component> *_resistors, *_capacitors, *_inductors;
     vector<component> *_voltageSource, *_currentSource;
-
+    unordered_map<string, int> *_nodeMap;
 };
 
 #endif

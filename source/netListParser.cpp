@@ -3,23 +3,22 @@
 #include <thread>
 #include <mutex>
 #include <sstream>
-#include <unordered_map>
 #include "ThreadPool.h"
 using namespace std;
 
-Parser::Parser():_debug(false), _threadNum(16), _steps(1){
+Parser::Parser():_debug(false), _threadNum(16), _steps(1), _nodeSize(0){
     _resistors = new vector<component>;
     _inductors = new vector<component>;
     _capacitors = new vector<component>;
     _currentSource = new vector<component>;
     _voltageSource = new vector<component>;
+    _nodeMap = new unordered_map<string, int>;
     // clock_t mstart = clock();
     // parse(fileName);
     // clock_t mend = clock();
     // cout << "total time: " << (mend - mstart) / (double) CLOCKS_PER_SEC << "s" << endl;
     if(getenv("DEBUG"))
         _debug = true;
-
 };
 
 Parser::~Parser(){
@@ -28,6 +27,7 @@ Parser::~Parser(){
     delete _capacitors;
     delete _currentSource;
     delete _voltageSource;
+    delete _nodeMap;
 }
 
 void Parser::parse(string fileName){
@@ -45,7 +45,7 @@ void Parser::parse(string fileName){
         _lines.push_back(sLine);
     }
     clock_t mend = clock();
-    cout << "time for reading: " << (mend - mstart) / (double) CLOCKS_PER_SEC << "s" << endl;
+    cout << "time for reading netlist: " << (mend - mstart) / (double) CLOCKS_PER_SEC << "s" << endl;
     // multi thread
     // ThreadPool* pool = new ThreadPool(_threadNum);
     // for(int i = 0; i < _lines.size(); ++i) {
@@ -62,10 +62,15 @@ void Parser::parse(string fileName){
     for(string& l : _lines){
         parseLine(l);
     }
+    cout << "total nodes: " << _nodeSize << endl;
     cout << "total resistors: " << _resistors->size() << endl;
     cout << "total inductors: " << _inductors->size() << endl;
     cout << "total capacitors: " << _capacitors->size() << endl;
     cout << "total current source: " << _currentSource->size() << endl;
+    cout << "total simulation steps: " << _steps << endl;
+    cout << "end parsing" << endl;
+    initCurrentSource();
+    // vector<float> v(_steps, 0);
     // cout << "processed lines: " << _tst.size() << endl;
 }
 
@@ -75,6 +80,7 @@ void Parser::parseLine(const string& line){
     }
     else{
         // TODO: build nodeMap
+        addNode(line);
         if(line[0] == 'i'){
             addCurrentSource(line);
         }
@@ -83,15 +89,31 @@ void Parser::parseLine(const string& line){
         }
     }
 }
+void Parser::addNode(const string& line){
+    vector<string> words;
+    split(words, line);
+    if(words[1] != "gnd" && words[1] != "0" && _nodeMap->find(words[1]) == _nodeMap->end()){
+        (*_nodeMap)[words[1]] = _nodeSize;
+        // cout << "add node: " << words[1] << " as " << _nodeSize << endl;
+        _nodeSize++;
+    }
+    if(words[2] != "gnd" && words[2] != "0" && _nodeMap->find(words[2]) == _nodeMap->end()){
+        (*_nodeMap)[words[2]] = _nodeSize;
+        // cout << "add node: " << words[2] << " as " << _nodeSize << endl;
+        _nodeSize++;
+    }
+}
 
 void Parser::addDirective(const string& line){
     vector<string> words;
     split(words, line);
     float start = stof(words[1]);
     float end = stof(words[2]);
-    float delta = stof(words[3]);
+    _delta = stof(words[3]);
     // unique_lock<mutex> lck(_mtx);
-    _steps = (end - start) / delta + 1;
+    _steps = (end - start) / _delta + 1;
+    for(int i = 0; i < _steps; i++)
+        _axis_x.push_back(i * _delta);
 }
 
 void Parser::addCurrentSource(const string& line){
@@ -99,14 +121,16 @@ void Parser::addCurrentSource(const string& line){
     split(words, line);
     if(words.size() == 4){
         // dc source
-        addDcCurrent(words[0], words[1], words[2], words[3]);
+        addDcCurrent(words[0], words[1], words[2], stof(words[3]));
     }
     else if(words.size() > 4){
         string name = words[0];
         string Np = words[1];
         string Nn = words[2];
         words.erase(words.begin(), words.begin() + 4);
-        addPwlCurrent(name, Np, Nn, words);
+        vector<float> vals;
+        for(auto& word : words) vals.push_back(stof(word));
+        addPwlCurrent(name, Np, Nn, vals);
     }
 }
 
@@ -119,12 +143,67 @@ void Parser::addPassive(const string& line){
         words.push_back(buf);
     }
     if(words[0][0] == 'r'){
-        addResistor(words[0], words[1], words[2], words[3]);
+        addResistor(words[0], words[1], words[2], stof(words[3]));
     }
     else if(words[0][0] == 'l'){
-        addInductor(words[0], words[1], words[2], words[3]);
+        addInductor(words[0], words[1], words[2], stof(words[3]));
     }
     else if(words[0][0] == 'c'){
-        addCapacitor(words[0], words[1], words[2], words[3]);
+        addCapacitor(words[0], words[1], words[2], stof(words[3]));
+    }
+}
+
+void Parser::interp(vector<float>& result, vector<float>& xp, vector<float>& fp){
+    // TODO: error when global delta less than delta in .tran
+    if(xp.size() <= 1) return;
+    vector<float> k;
+    if(xp[0] != 0){
+        xp.insert(xp.begin(), 0);
+        fp.insert(fp.begin(), 0);
+    }
+    if(xp.back() != 0){
+        xp.push_back(_axis_x.back());
+        fp.push_back(0);
+    }
+    for(int i = 0; i < xp.size() - 1; i++){
+        // cout << xp[i] << ", " << fp[i] << endl;
+        float slope = (fp[i+1] - fp[i]) / (xp[i+1] - xp[i]);
+        k.push_back(slope);
+        // cout << slope << endl;
+    }
+    int curr = 0;
+    for(int j = 0; j < _steps; j++){
+        if(_axis_x[j] > xp[curr + 1]) curr++;
+        result[j] = (fp[curr] + (_axis_x[j] - xp[curr]) * k[curr]);
+    }
+    // for(auto val : result) cout << val <<endl;
+}
+
+void Parser::initCurrentSource(){
+    for(auto& csrc : *_currentSource){
+        vector<float> t, v, y(_steps, 0);
+        if(!csrc.isDC()){
+            // PWL source
+            for(int i = 0; i < csrc._waveform.size(); i+=2){
+                t.push_back(-csrc._waveform[i]);
+                v.push_back(-csrc._waveform[i+1]);
+            }
+            interp(y, t, v);
+            // ofstream out("./output.txt");
+            // for(auto t : _axis_x) out << to_string(t) + ' ';
+            // out << '\n';
+            // for(auto val : y) out << to_string(val) + ' ';
+            // out.close();
+        }
+        else{
+            // DC source
+            vector<float> y;
+            for(int i = 0; i < _steps; i++){
+                y.push_back(csrc._val);
+            }
+            // for(auto v : y) cout << v << endl;
+            // cout << y.size() << endl;
+        }
+        csrc._waveform = y;
     }
 }
