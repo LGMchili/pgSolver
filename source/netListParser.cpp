@@ -1,9 +1,5 @@
 #include "netListParser.h"
-#include <iostream>
-#include <thread>
-#include <mutex>
-#include <sstream>
-#include "ThreadPool.h"
+
 using namespace std;
 
 Parser::Parser():_debug(false), _threadNum(16), _steps(1), _nodeSize(0){
@@ -44,8 +40,6 @@ void Parser::parse(string fileName){
         toLower(sLine);
         _lines.push_back(sLine);
     }
-    clock_t mend = clock();
-    cout << "time for reading netlist: " << (mend - mstart) / (double) CLOCKS_PER_SEC << "s" << endl;
     // multi thread
     // ThreadPool* pool = new ThreadPool(_threadNum);
     // for(int i = 0; i < _lines.size(); ++i) {
@@ -68,8 +62,9 @@ void Parser::parse(string fileName){
     cout << "total capacitors: " << _capacitors->size() << endl;
     cout << "total current source: " << _currentSource->size() << endl;
     cout << "total simulation steps: " << _steps << endl;
-    cout << "end parsing" << endl;
     initCurrentSource();
+    clock_t mend = clock();
+    cout << "total time for parsing: " << (mend - mstart) / (double) CLOCKS_PER_SEC << "s" << endl;
     // vector<float> v(_steps, 0);
     // cout << "processed lines: " << _tst.size() << endl;
 }

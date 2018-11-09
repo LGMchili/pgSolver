@@ -6,7 +6,11 @@
 #include <vector>
 #include <functional>
 #include <unordered_map>
-#include "Circuit.h"
+#include <iostream>
+#include <thread>
+#include <mutex>
+#include <sstream>
+#include "ThreadPool.h"
 using namespace std;
 struct component
 {
@@ -46,6 +50,8 @@ public:
     inline vector<component>* getCurrentSource(){ return _currentSource; }
     inline vector<component>* getVoltageSource(){ return _voltageSource; }
     inline unordered_map<string, int>* getNodeMap(){ return _nodeMap; }
+    inline int getNode(string str) { return (*_nodeMap)[str]; }
+    inline float getDelta() { return _delta; }
 private:
     void split(vector<string>& words, const string& line){
         string str(line);
