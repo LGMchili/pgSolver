@@ -25,8 +25,8 @@ Simulator::~Simulator(){
 
 void Simulator::simulate(){
     spMatrix G(_nodeNum, _nodeNum);
-    spMatrix L(_nodeNum, _nodeNum);
-    spMatrix C(_nodeNum, _nodeNum);
+    // spMatrix L(_nodeNum, _nodeNum);
+    // spMatrix C(_nodeNum, _nodeNum);
     initMatrix(*_parser->getResistors(), G);
     // cout << G << endl;
     // initMatrix(*_parser->getInductors(), L);
@@ -57,7 +57,7 @@ void Simulator::initMatrix(const vector<component>& comps, spMatrix& mat){
 
 int main(){
     clock_t mstart = clock();
-    Simulator simulator("../python/tstCir2.sp");
+    Simulator simulator("../python/tstCir.sp");
     simulator.simulate();
     clock_t mend = clock();
     cout << "total time: " << (mend - mstart) / (double) CLOCKS_PER_SEC << "s" << endl;

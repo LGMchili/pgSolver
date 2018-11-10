@@ -2,13 +2,13 @@
 
 using namespace std;
 
-Parser::Parser():_debug(false), _threadNum(16), _steps(1), _nodeSize(0){
+Parser::Parser():_debug(false), _threadNum(16), _steps(1), _nodeSize(0), _resNum(0), _indNum(0), _capNum(0){
     _resistors = new vector<component>;
     _inductors = new vector<component>;
     _capacitors = new vector<component>;
     _currentSource = new vector<component>;
     _voltageSource = new vector<component>;
-    _nodeMap = new unordered_map<string, int>;
+    _nodeMap = new unordered_map<string, u32>;
     // clock_t mstart = clock();
     // parse(fileName);
     // clock_t mend = clock();
@@ -38,6 +38,7 @@ void Parser::parse(string fileName){
             continue;
         }
         toLower(sLine);
+        if(sLine[0] == 'r') addNode(sLine);
         _lines.push_back(sLine);
     }
     // multi thread
@@ -57,9 +58,9 @@ void Parser::parse(string fileName){
         parseLine(l);
     }
     cout << "total nodes: " << _nodeSize << endl;
-    cout << "total resistors: " << _resistors->size() << endl;
-    cout << "total inductors: " << _inductors->size() << endl;
-    cout << "total capacitors: " << _capacitors->size() << endl;
+    cout << "total resistors: " << _resNum << endl;
+    cout << "total inductors: " << _indNum << endl;
+    cout << "total capacitors: " << _capNum << endl;
     cout << "total current source: " << _currentSource->size() << endl;
     cout << "total simulation steps: " << _steps << endl;
     initCurrentSource();
@@ -74,8 +75,6 @@ void Parser::parseLine(const string& line){
         addDirective(line);
     }
     else{
-        // TODO: build nodeMap
-        addNode(line);
         if(line[0] == 'i'){
             addCurrentSource(line);
         }
@@ -98,7 +97,28 @@ void Parser::addNode(const string& line){
         _nodeSize++;
     }
 }
-
+void Parser::addComponent(string Np, string Nn, float val, pairMap& comps){
+    // unique_lock<mutex> lck(_mtx);
+    // build map for diagonal elements
+    if(Np != "0" && Np != "gnd" && Nn != "0" && Nn != "gnd"){
+        int np = getNode(Np), nn = getNode(Nn);
+        pair<int, int> npnn(np, nn), nnnp(nn, np), nnnn(nn, nn), npnp(np, np);
+        comps[npnn] = -1 / val;
+        comps[nnnp] = -1 / val;
+        comps[nnnn] += 1 / val;
+        comps[npnp] += 1 / val;
+    }
+    else if(Np != "0" && Np != "gnd"){
+        int np = (*_nodeMap)[Np];
+        pair<int, int> npnp(np, np);
+        comps[npnp] += 1 / val;
+    }
+    else{
+        int nn = (*_nodeMap)[Nn];
+        pair<int, int> nnnn(nn, nn);
+        comps[nnnn] += 1 / val;
+    }
+}
 void Parser::addDirective(const string& line){
     vector<string> words;
     split(words, line);
