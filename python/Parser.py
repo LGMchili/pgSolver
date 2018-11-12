@@ -131,7 +131,7 @@ class SpiceParser:
             # dc analysis
             # current source initialize as single point value
             for i in range(len(self._CurrentSource)):
-                val = float(self._CurrentSource[i]._val[0])
+                val = -float(self._CurrentSource[i]._val[0])
                 self._CurrentSource[i]._val = val
 
 if __name__ == "__main__":

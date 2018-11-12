@@ -67,6 +67,9 @@ public:
     inline unordered_map<string, u32>* getNodeMap(){ return _nodeMap; }
     inline int getNode(string str) { return (*_nodeMap)[str]; }
     inline float getDelta() { return _delta; }
+    inline int getSteps(){ return _steps; }
+
+    vector<float> _axis_x;
 private:
     void split(vector<string>& words, const string& line){
         string str(line);
@@ -88,19 +91,19 @@ private:
     }
     inline void addResistor(string name, string Np, string Nn, float val){
         // unique_lock<mutex> lck(_mtx);
-        _resistors->emplace_back(name, Np, Nn, val);
+        _resistors->emplace_back(name, Np, Nn, 1 / val);
         // addComponent(Np, Nn, val, _resistorsMap);
         _resNum++;
     }
     inline void addCapacitor(string name, string Np, string Nn, float val){
         // unique_lock<mutex> lck(_mtx);
-        _capacitors->emplace_back(name, Np, Nn, val);
+        _capacitors->emplace_back(name, Np, Nn, 2 / _delta * val);
         // addComponent(Np, Nn, val, _capacitorsMap);
         _capNum++;
     }
     inline void addInductor(string name, string Np, string Nn, float val){
         // unique_lock<mutex> lck(_mtx);
-        _inductors->emplace_back(name, Np, Nn, val);
+        _inductors->emplace_back(name, Np, Nn, _delta / (2 * val));
         // addComponent(Np, Nn, val, _inductorsMap);
         _indNum++;
     }
@@ -126,7 +129,6 @@ private:
     vector<string> _tst;
     mutex _mtx;
     vector<function<void()> > _tasks;
-    vector<float> _axis_x;
     pairMap _resistorsMap;
     vector<component> *_resistors, *_capacitors, *_inductors;
     vector<component> *_voltageSource, *_currentSource;

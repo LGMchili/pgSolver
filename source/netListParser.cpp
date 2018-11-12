@@ -39,6 +39,7 @@ void Parser::parse(string fileName){
         }
         toLower(sLine);
         if(sLine[0] == 'r') addNode(sLine);
+        if(sLine[0] == '.') addDirective(sLine);
         _lines.push_back(sLine);
     }
     // multi thread
@@ -71,16 +72,11 @@ void Parser::parse(string fileName){
 }
 
 void Parser::parseLine(const string& line){
-    if(line[0] == '.'){
-        addDirective(line);
+    if(line[0] == 'i'){
+        addCurrentSource(line);
     }
     else{
-        if(line[0] == 'i'){
-            addCurrentSource(line);
-        }
-        else{
-            addPassive(line);
-        }
+        addPassive(line);
     }
 }
 void Parser::addNode(const string& line){
@@ -196,11 +192,11 @@ void Parser::interp(vector<float>& result, vector<float>& xp, vector<float>& fp)
 
 void Parser::initCurrentSource(){
     for(auto& csrc : *_currentSource){
-        vector<float> t, v, y(_steps, 0);
         if(!csrc.isDC()){
             // PWL source
+            vector<float> t, v, y(_steps, 0);
             for(int i = 0; i < csrc._waveform.size(); i+=2){
-                t.push_back(-csrc._waveform[i]);
+                t.push_back(csrc._waveform[i]);
                 v.push_back(-csrc._waveform[i+1]);
             }
             interp(y, t, v);
@@ -209,16 +205,15 @@ void Parser::initCurrentSource(){
             // out << '\n';
             // for(auto val : y) out << to_string(val) + ' ';
             // out.close();
+            csrc._waveform = y;
         }
         else{
             // DC source
             vector<float> y;
             for(int i = 0; i < _steps; i++){
-                y.push_back(csrc._val);
+                y.push_back(-csrc._val);
             }
-            // for(auto v : y) cout << v << endl;
-            // cout << y.size() << endl;
+            csrc._waveform = y;
         }
-        csrc._waveform = y;
     }
 }
