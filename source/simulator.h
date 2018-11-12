@@ -15,6 +15,7 @@ public:
     void initMatrix(const vector<component>& comps, spMatrix& mat);
     vector<vector<float>> initCurrVector(const vector<component>& srcs);
     VectorXd getCurrentVector(int step);
+    void buildCircuit(spMatrix& A, spMatrix& D, spMatrix& L);
     void createMatrix();
     void createVector();
     void buildDcCircuit();

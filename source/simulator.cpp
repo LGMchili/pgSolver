@@ -22,27 +22,27 @@ Simulator::Simulator(string fileName){
 Simulator::~Simulator(){
     delete _parser;
 }
-
-void Simulator::simulate(){
+void Simulator::buildCircuit(spMatrix& A, spMatrix& D, spMatrix& L){
     clock_t mstart = clock();
-
-    int steps = _parser->getSteps();
     spMatrix G(_nodeNum, _nodeNum);
-    spMatrix L(_nodeNum, _nodeNum);
     spMatrix C(_nodeNum, _nodeNum);
     initMatrix(*_parser->getResistors(), G);
     initMatrix(*_parser->getInductors(), L);
     initMatrix(*_parser->getCapacitors(), C);
-    // the equation is Ax(t+1) = Dx(t) - il
-    spMatrix A = G + C + L;
-    spMatrix D = -G + C - L;
-    VectorXd curr_x(_nodeNum), prev_x(_nodeNum),
-                ii(_nodeNum), iv(_nodeNum), il(_nodeNum);
+    A = G + C + L;
+    D = -G + C - L;
     clock_t mend = clock();
     cout << "total time for build circuit: " << (mend - mstart) / (double) CLOCKS_PER_SEC << "s" << endl;
+}
+void Simulator::simulate(){
+
+    int steps = _parser->getSteps();
+    spMatrix A, D, L(_nodeNum, _nodeNum);
+    buildCircuit(A, D, L);
+    // the equation is Ax(t+1) = Dx(t) - il
+    VectorXd curr_x(_nodeNum), prev_x(_nodeNum), ii(_nodeNum), iv(_nodeNum), il(_nodeNum);
     il.setZero();
     prev_x.setOnes();
-    // cout << iv.rows() << ' ' << iv.cols() << endl;
     Eigen::SimplicialLDLT<spMatrix> solver;
     solver.compute(A);
     if(solver.info() != Eigen::Success) {
@@ -110,7 +110,7 @@ void Simulator::initMatrix(const vector<component>& comps, spMatrix& mat){
 
 int main(){
     clock_t mstart = clock();
-    Simulator simulator("../python/tstCir2.sp");
+    Simulator simulator("../python/tstCir.sp");
     simulator.simulate();
     clock_t mend = clock();
     cout << "total time: " << (mend - mstart) / (double) CLOCKS_PER_SEC << "s" << endl;
