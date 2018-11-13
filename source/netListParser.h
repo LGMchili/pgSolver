@@ -46,6 +46,7 @@ struct component
     float _val;
     bool _isDC = true;
     vector<float> _waveform;
+
 };
 class Parser{
 public:
@@ -57,6 +58,7 @@ public:
     void addPassive(const string& line);
     void addCurrentSource(const string& line);
     void initCurrentSource();
+    void buildDisjointSet();
     inline vector<component>* getResistors(){ return _resistors; }
     inline vector<component>* getInductors(){ return _inductors; }
     inline vector<component>* getCapacitors(){ return _capacitors; }
@@ -67,7 +69,7 @@ public:
     inline int getNode(string str) { return (*_nodeMap)[str]; }
     inline float getDelta() { return _delta; }
     inline int getSteps(){ return _steps; }
-
+    vector<string> _probe;
     vector<float> _axis_x;
 private:
     void split(vector<string>& words, const string& line){
@@ -132,6 +134,7 @@ private:
     vector<component> *_resistors, *_capacitors, *_inductors;
     vector<component> *_voltageSource, *_currentSource;
     unordered_map<string, u32> *_nodeMap;
+    unordered_map<u32, vector<string>> _disjointSet;
 };
 
 #endif

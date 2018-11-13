@@ -25,7 +25,32 @@ Parser::~Parser(){
     delete _voltageSource;
     delete _nodeMap;
 }
-
+int myFind(vector<int>& parent, int i){
+    if(parent[i] == -1) return i;
+    else return myFind(parent, parent[i]);
+}
+void myUnion(int i, int j, vector<int>& parent){
+    int xi = myFind(parent, i);
+    int xj = myFind(parent, j);
+    if(xi != xj) parent[xi] = xj;
+}
+void Parser::buildDisjointSet(){
+    vector<int> nodes(_nodeSize, -1);
+    for(string& l : _lines){
+        if(l[0] == '.') continue;
+        vector<string> words;
+        split(words, l);
+        int i = getNode(words[1]), j = getNode(words[2]);
+        myUnion(i, j, nodes);
+    }
+    for(string& l : _lines){
+        if(l[0] == '.') continue;
+        vector<string> words;
+        split(words, l);
+        u32 i = myFind(nodes, getNode(words[1]));
+        _disjointSet[i].push_back(l);
+    }
+}
 void Parser::parse(string fileName){
     //
     clock_t mstart = clock();
@@ -42,6 +67,7 @@ void Parser::parse(string fileName){
         if(sLine[0] == '.') addDirective(sLine);
         _lines.push_back(sLine);
     }
+    // buildDisjointSet();
     // multi thread
     // ThreadPool* pool = new ThreadPool(_threadNum);
     // for(int i = 0; i < _lines.size(); ++i) {
@@ -69,6 +95,11 @@ void Parser::parse(string fileName){
     cout << "total time for parsing: " << (mend - mstart) / (double) CLOCKS_PER_SEC << "s" << endl;
     // vector<float> v(_steps, 0);
     // cout << "processed lines: " << _tst.size() << endl;
+    cout << "subnets: " << _disjointSet.size() << endl;
+    // for(auto& s : _disjointSet){
+    //     cout << s.first << endl;
+    //     cout << s.second.size() << endl;
+    // }
 }
 
 void Parser::parseLine(const string& line){
@@ -118,13 +149,19 @@ void Parser::addComponent(string Np, string Nn, float val, pairMap& comps){
 void Parser::addDirective(const string& line){
     vector<string> words;
     split(words, line);
-    float start = stof(words[1]);
-    float end = stof(words[2]);
-    _delta = stof(words[3]);
-    // unique_lock<mutex> lck(_mtx);
-    _steps = (end - start) / _delta + 1;
-    for(int i = 0; i < _steps; i++)
+    if(words[0] == ".tran"){
+        float start = stof(words[1]);
+        float end = stof(words[2]);
+        _delta = stof(words[3]);
+        // unique_lock<mutex> lck(_mtx);
+        _steps = (end - start) / _delta + 1;
+        for(int i = 0; i < _steps; i++)
         _axis_x.push_back(i * _delta);
+    }
+    else if(words[0] == ".probe"){
+        for(int i = 1; i < words.size(); i++)
+            _probe.push_back(words[i]);
+    }
 }
 
 void Parser::addCurrentSource(const string& line){

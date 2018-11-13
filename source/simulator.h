@@ -22,12 +22,14 @@ public:
     void buildTransientCircuit();
     void dcAnalysis();
     void transientAnalysis();
-
+    void recordData(const VectorXd& vec);
+    void dump();
 
 private:
     Parser *_parser;
     int _resNum, _indNum, _capNum, _currNum, _volNum, _nodeNum;
     float _delta;
+    unordered_map<string, vector<float>> _data;
     // vector<component> *_resistors, *_capacitors, *_inductors;
     // vector<component> *_voltageSource, *_currentSource;
     // unordered_map<string, int> *_nodeMap;

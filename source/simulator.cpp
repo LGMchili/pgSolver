@@ -11,6 +11,10 @@ Simulator::Simulator(string fileName){
     _volNum = (_parser->getVoltageSource())->size();
     _nodeNum = (_parser->getNodeMap())->size();
     _delta = _parser->getDelta();
+    for(auto& node : _parser->_probe){
+        vector<float> d(1, 1); // equal with vdd
+        _data[node] = d;
+    }
     // _resistors = _parser->getResistors();
     // _inductors = _parser->getInductors();
     // _capacitors = _parser->getCapacitors();
@@ -34,8 +38,25 @@ void Simulator::buildCircuit(spMatrix& A, spMatrix& D, spMatrix& L){
     clock_t mend = clock();
     cout << "total time for build circuit: " << (mend - mstart) / (double) CLOCKS_PER_SEC << "s" << endl;
 }
-void Simulator::simulate(){
 
+void Simulator::recordData(const VectorXd& vec){
+    for(auto& node : _parser->_probe){
+        _data[node].push_back(vec[_parser->getNode(node)]);
+    }
+}
+void Simulator::dump(){
+    ofstream out("./output.txt");
+    for(auto t : _parser->_axis_x) out << to_string(t) + ' ';
+    out << '\n';
+    for(auto& node : _parser->_probe){
+        out << node + ": ";
+        for(auto& v : _data[node]){
+            out << to_string(v) + ' ';
+        }
+    }
+    out.close();
+}
+void Simulator::simulate(){
     int steps = _parser->getSteps();
     spMatrix A, D, L(_nodeNum, _nodeNum);
     buildCircuit(A, D, L);
@@ -49,21 +70,17 @@ void Simulator::simulate(){
       // decomposition failed
       throw std::invalid_argument( "broken nets" );
     }
-    ofstream out("./output.txt");
-    for(auto t : _parser->_axis_x) out << to_string(t) + ' ';
-    out << '\n';
     // change node in getNode for recording
-    out << to_string(prev_x[_parser->getNode("n1")])  + ' ';
     for(int i = 1; i < steps; i++){
         ii = getCurrentVector(i) + getCurrentVector(i-1);
         iv = D * prev_x;
         VectorXd rhs = ii + iv - il;
         curr_x = solver.solve(rhs);
-        out << to_string(curr_x[_parser->getNode("n1")]) + ' ';
+        recordData(curr_x);
         il = il + (2 * L * (curr_x + prev_x));
         prev_x = curr_x;
     }
-    out.close();
+    dump();
 }
 vector<vector<float>> Simulator::initCurrVector(const vector<component>& srcs){
     int n = srcs.size();
@@ -110,8 +127,8 @@ void Simulator::initMatrix(const vector<component>& comps, spMatrix& mat){
 
 int main(){
     clock_t mstart = clock();
-    Simulator simulator("../python/tstCir.sp");
-    simulator.simulate();
+    Simulator simulator("../python/tstCir5.sp");
+    // simulator.simulate();
     clock_t mend = clock();
     cout << "total time: " << (mend - mstart) / (double) CLOCKS_PER_SEC << "s" << endl;
 }
